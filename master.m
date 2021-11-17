@@ -2,9 +2,8 @@ Params.N_workers = 19;
 Params.power = 4;
 Params.temperature = 317;
 Params.name = '8um_S1_K12_post';
-Params.absorption_file = '0.027';
-Params.absorption_file_ref = '0.027';
-Params.laser_spot_radius = 0.3;
+Params.absorption_value = 0.027;
+Params.laser_spot_radius = 0.185;
 Params.membrane_radius = 4.0;
 Params.membrane_mask = 3.5;
 spatial_averaging = 0;
@@ -77,7 +76,7 @@ catch
     fprintf('%s -- Getting absorption...', datetime('now'));
     fprintf(fid, '%s -- Getting absorption...', datetime('now'));
     
-    Absorption = str2double(Params.absorption_file) * ones(size(T_exp));
+    Absorption = Params.absorption_value * ones(size(T_exp));
     
     %% double absorption on support
     [X,Y] = meshgrid(X_array, Y_array);
