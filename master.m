@@ -1,56 +1,58 @@
-Params.N_workers = 19;
-Params.power = 4;
-Params.temperature = 317;
-Params.name = '8um_S1_K12_post';
-Params.absorption_value = 0.027;
-Params.laser_spot_radius = 0.185;
-Params.membrane_radius = 4.0;
-Params.membrane_mask = 3.5;
-spatial_averaging = 0;
-Params.power_correction = 1;
-Params.g = 28000000;
-Params.convection = 29000;
+%% clear
+clear
+clc
+close all
+
+%% Settings
+Params.N_workers = 19;                       % number of parallel workers
+Params.power = 4;                           % laser power [mW]
+Params.temperature = 317;                   % bath temperature [K]
+Params.name = '8um_S1_K12_post';            % sample name
+Params.absorption_value = 0.027;            % absorption
+Params.laser_spot_radius = 0.185;           % laser spot radius [um]
+Params.membrane_radius = 4.0;               % membrane radius [um]
+Params.membrane_mask = 3.5;                 % mask radius for ignoring edge effects [um]
+spatial_averaging = 0;                      % spatial averaging when adjusting Kappa and absoprtion maps 
+Params.power_correction = 1;                % optional power correction for accounting for power loss in system
+Params.g = 28000000;                        % Interfacial [W/(K*m^2)]
+Params.convection = 29000;                  % convection [W/(K*m^2)]
+
+T_max_error_conv = 5;                       % optional convergence parameter for max temperature error [K]
+T_mean_error_conv = 1;                      % optional convergence parameter for mean temperature error [K]
+convergence_slope_kappa = 1.1;              % kappa adjustment (Beta_K)
+convergence_slope_absorption = 0.0001;      % absorption adjustment (Beta_A)
+
+Params.support_radius = 20.0;               % size of support (outer domain) [um]
+Params.grid_resolution = 1;                 % comsol mesh resolution 1-10. 1- best, 10 worst
+Params.display = 1;                         % set verbose on
+Params.Timeout = 120;                       % timeout for connecting to comsol server
+Params.laser_spot_radius_tot = 2.5;         % cut-off for laser Gaussian beam [um]
+
+Kappa_min = 100;                            % lower bound for kappa [W/m/K]
+Kappa_max = 4000;                           % upper bound for kappa [W/m/K]
+Kappa_start = 1000;                         % initial guess kappa [W/m/K]
+Params.Kappa_support = 500;                 % kappa value on support [W/m/K]
+
+Absorption_min = 0.023;                     % lower bound for absorption 
+
+Params.N_kappa = 50;                        % number of cycle to adjust kappa
+Params.N_absorption = 100;                  % number of cycle to adjust absorption
+Params.N_kappa_init = 100;                  % number of cycle to adjust kappa at start
+N_total = 200;                              % Total number of iterations
+
+%% add paths
+addpath(genpath('functions'));
+addpath(genpath('/opt/ud/comsol56/mli'));   % Matlab LiveLink path
+
+%% disable mpiexec
 distcomp.feature( 'LocalUseMpiexec', false )
 
-%% clean up
-system('rm tmp/status_*');
-system('rm tmp/pid_*');
-system('rm tmp/port_*');
-system('rm tmp/logfile_*');
-system('killall java');
-system('rm tmp/worker_time*');
-
-%%
+%% clean up temporary files if available
+system('rm tmp/ -r');
 mkdir('tmp');
 
-%% parameters
-T_max_error_conv = 5;    % K
-T_mean_error_conv = 1;    % K
-convergence_slope_kappa = 1.1;
-convergence_slope_absorption = 0.0001;
-addpath(genpath('functions'));
-addpath(genpath('/opt/ud/comsol55/mli'));
-
-%Params.g = 1.724e7;		%  Villaroman et al. Carbon 2017
-Params.support_radius = 20.0;    % um
-Params.grid_resolution = 1;
-Params.display = 0;
-Params.Timeout = 120;
-Params.laser_spot_radius_tot = 2.5; % um
-Params.export_data = 0;         % export each temperature map as dat file
-Params.export_mph = 0;          % export each mph file
-
-Kappa_min = 100;
-Kappa_max = 4000;
-Kappa_start = 1000;
-Params.Kappa_support = 500;
-Params.N_kappa = 50;
-Params.N_absorption = 100;
-Params.N_kappa_init = 100;
-
-N_total = 200;
-
-Absorption_min = 0.023;
+%% kill existing comsol servers
+system('killall java');
 
 %% set parameters
 fid = fopen('logfile','w');
@@ -63,7 +65,7 @@ catch
     %% get T experimental
     fprintf('%s -- Getting experimental T...', datetime('now'));
     fprintf(fid, '%s -- Getting experimental T...', datetime('now'));
-    load(sprintf('Input_data/Formatted data/%s/calculated_temperature_%1.2fmW_%1.0fK.mat', Params.name, Params.power, Params.temperature));
+    load(sprintf('Input_data/Formatted_data/%s/calculated_temperature_%1.2fmW_%1.0fK.mat', Params.name, Params.power, Params.temperature));
     X_array = X;
     Y_array = Y;
     
@@ -87,7 +89,7 @@ catch
     fprintf('done\n');
     fprintf(fid, 'done\n');
     
-    %% Intialize mask
+    %% Intialize mask for adjustement
     Kappa = zeros(size(X)) + Kappa_start;
     Kappa( sqrt(X.^2 + Y.^2) > Params.membrane_radius) = Params.Kappa_support;
     mask = zeros(size(Kappa));
@@ -108,10 +110,6 @@ catch
     TEMP = cell(1,1);
     KAPPA = cell(1,1);
     ABSORPTION = cell(1,1);
-    DIFF_KAPPA = cell(1,1);
-    DIFF_ABSORPTION = cell(1,1);
-    DIFF_KAPPA_SMOOTH = cell(1,1);
-    DIFF_ABSORPTION_SMOOTH = cell(1,1);
     T_Max_Error = zeros(1);
     T_Mean_Error = zeros(1);
     
@@ -194,10 +192,7 @@ while T_max_error > T_max_error_conv && T_mean_error > T_mean_error_conv && conv
     Kappa_new = Kappa + Diff_av;
     Kappa_new(Kappa_new < Kappa_min) = Kappa_min;
     Kappa_new(Kappa_new > Kappa_max) = Kappa_max;
-    
-    DIFF_KAPPA{convergence_counter} = Diff;
-    DIFF_KAPPA_SMOOTH{convergence_counter} = Diff_av;
-    
+        
     %% adjust absorption
     if strcmp(Adjust{convergence_counter}, 'Absorption')
         Diff = convergence_slope_absorption * (T_new - T_exp);
@@ -224,10 +219,7 @@ while T_max_error > T_max_error_conv && T_mean_error > T_mean_error_conv && conv
     Diff_av(mask == 0) = 0;
     Absorption_new = Absorption - Diff_av;
     Absorption_new(Absorption_new < Absorption_min) = Absorption_min;
-    
-    DIFF_ABSORPTION{convergence_counter} = Diff;
-    DIFF_ABSORPTION_SMOOTH{convergence_counter} = Diff_av;
-    
+        
     %% save data
     save('Data.mat')
     
@@ -238,5 +230,3 @@ while T_max_error > T_max_error_conv && T_mean_error > T_mean_error_conv && conv
     convergence_counter = convergence_counter + 1;
     
 end
-
-

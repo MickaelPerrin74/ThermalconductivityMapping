@@ -4,10 +4,6 @@ pos_x = varargin{1};
 pos_y= varargin{2};
 Params = varargin{3};
 
-if length(varargin) == 4
-    index = varargin{4};
-end
-
 %% import comsol
 import com.comsol.model.*
 import com.comsol.model.util.*
@@ -111,8 +107,6 @@ for i = 1:N_domain
 end
 
 [~ , idxs] = sort(Area);
-% Area(Area<0.01) = [];
-% N_domain = length(Area);
 index_graphene = idxs(end);
 index_graphene_suspended = idxs(end-1);
 
@@ -216,7 +210,6 @@ if N_domain == 5
         model.component('mod1').physics('ht').feature('hs5').set('Q0', '(Q_abs / (2*pi*r0^2) / t_gr * exp(- ((x-pos_x)^2)/(2*r0^2) -((y-pos_y)^2)/(2*r0^2))) - (g * (T-T0) / t_gr) - (h_conv * (T-T0) / t_gr)'); % on support
 
     end
-
 end
 
 % add laser for both spots intersecting
@@ -260,8 +253,6 @@ if N_domain == 6
     model.component('mod1').physics('ht').feature('hs6').set('Q0', '(Q_abs / (2*pi*r0^2) / t_gr * exp(- ((x-pos_x)^2)/(2*r0^2) -((y-pos_y)^2)/(2*r0^2))) - (g * (T-T0) / t_gr) - (h_conv * (T-T0) / t_gr)'); % on support
 
 end
-
-
 
 % set heat properties graphene
 model.component('mod1').physics('ht').feature('solid1').label('Heat Transfer in Solids');
@@ -327,45 +318,5 @@ model.result.numerical('av1').set('dataseries', 'average');
 model.result.numerical('av1').setResult;
 
 T = tabel1.getReal;
-
-%% make plot
-% model.result.create('pg1', 'PlotGroup3D');
-% model.result('pg1').feature.create('slc1', 'Slice');
-% model.result('pg1').name('Electric Potential (es1)');
-% model.result('pg1').set('title', 'Slice: Electric potential (V) ');
-% model.result('pg1').set('titleactive', false);
-% model.result('pg1').feature('slc1').set('quickplane', 'xy');
-% model.result('pg1').feature('slc1').set('quickznumber', '1');
-% model.result('pg1').feature('slc1').set('rangecoloractive', 'on');
-% model.result('pg1').feature('slc1').set('rangecolormin', '-10');
-% model.result('pg1').feature('slc1').set('rangecolormax', '10');
-
-%% export data
-if Params.export_data && (index == 5101 || mod(index,102) == 1)
-    if ~exist(sprintf ('%s/data', pwd),'dir')
-        mkdir(sprintf ('%s/data', pwd));
-    end
-    
-    model.result.export.create('data1', 'Data');
-    filename = sprintf ('%s/data/T_map_%04d.dat', pwd, index);
-    % filename = tempname;
-    model.result.export('data1').set('filename', filename);
-    model.result.export('data1').set('header', false);
-    model.result.export('data1').set('sort', true);
-    model.result.export('data1').set('location', 'regulargrid');
-    model.result.export('data1').set('regulargridx2', 1001);
-    model.result.export('data1').set('regulargridy2', 1001);
-    model.result.export('data1').set('gridstruct', 'grid');
-    
-    model.result.export.run
-    
-end
-
-if Params.export_mph
-    if ~exist(sprintf ('%s/%s/data', pwd, Params.name),'dir')
-        mkdir(sprintf ('%s/%s/data', pwd, Params.name));
-    end
-    model.save(sprintf ('%s/%s/data/model%04d.mph', pwd, Params.name, index));
-end
 
 return

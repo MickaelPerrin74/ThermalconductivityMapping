@@ -44,14 +44,12 @@ Display = Params.display;
 parfor index1 = 1:N_calcs
     
     run = true;
-%     ME.message = '';
     
     %% run single calculation
     while run
         
         %% get worker id
         t = getCurrentTask();
-%                t.ID = 1;
         
         %% logfile
         fid = fopen(sprintf('tmp/logfile_%02d', t.ID),'a');
@@ -61,7 +59,7 @@ parfor index1 = 1:N_calcs
             
             done = 0;
             pause(t.ID);
-            % start server
+
             while done == 0
                 fprintf(fid, '%s -- Starting comsol server... \n', datetime('now'));
                 fprintf('%s -- Starting comsol server... \n', datetime('now'));
@@ -101,21 +99,8 @@ parfor index1 = 1:N_calcs
                 delete(sprintf('tmp/port_%02d', t.ID));
                 system(sprintf('kill %01d', dlmread(sprintf('tmp/pid_%02d', t.ID))));
                 delete(sprintf('tmp/pid_%02d', t.ID));
-%                 ME.message = ''; 
             end
-%             if strcmp(ME.message, 'Already connected to a server')
-%                 fprintf(fid, '%s -- Already connected to a server\n', datetime('now'));
-%                 fprintf('%s -- Already connected to a server\n', datetime('now'));
-%                 dlmwrite(sprintf('tmp/status_%02d', t.ID), 3);
-%             elseif regexp(ME.message,'A connection to COMSOL could not be established')
-%                 fprintf(fid, '%s -- Cannot connect to server\n', datetime('now'));
-%                 fprintf('%s -- Cannot connect to server\n', datetime('now'));
-%                 dlmwrite(sprintf('tmp/status_%02d', t.ID), 1);
-%                 delete(sprintf('tmp/port_%02d', t.ID));
-%                 system(sprintf('kill %01d', dlmread(sprintf('tmp/pid_%02d', t.ID))));
-%                 delete(sprintf('tmp/pid_%02d', t.ID));
-%             else
-%             end
+
         end
         
         %% run calculations
@@ -136,7 +121,7 @@ parfor index1 = 1:N_calcs
             
             % run calculation
             try
-                Temp(index1) = comsol_model_gaussian(pos_x, pos_y, Params, index1);
+                Temp(index1) = comsol_model_gaussian(pos_x, pos_y, Params);
                 run = false;
             catch ME
                 display(ME)
@@ -149,7 +134,6 @@ parfor index1 = 1:N_calcs
         fclose(fid);
         
     end
-%      clear ME
 end
 
 %% assemble data
